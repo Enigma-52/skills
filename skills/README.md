@@ -1,6 +1,6 @@
 # lstack
 
-lstack is a Claude Code plugin with 41 first-party Agent Skills for everyday
+lstack is a Claude Code plugin with 42 first-party Agent Skills for everyday
 engineering and product work: code review, test generation, documentation,
 diagrams, release shipping, repository cleanup, SEO and App Store audits,
 product planning, and multi-agent orchestration. Each skill is a plain-text
@@ -62,6 +62,7 @@ working in. That is the only network access many skills make.
 |---|---|---|---|---|
 | agent-config | your git remote | none | none; writes local files only | git |
 | ai-job-scout | web search and fetch: public profiles, employer career sites, ATS boards (Greenhouse, Lever, Ashby, Workable), job aggregators | search queries built from the candidate's skills, roles and location | none; never applies or contacts anyone | web search/fetch, optional browser |
+| appstore-assets | your git remote; developer.apple.com (screenshot and creative-asset spec pages); Google Fonts and raw.githubusercontent.com/google/fonts (caption font and its license); the app's landing page when there is no code; GitHub when `asm deps acquire` fetches `emil-design-eng` | the spec and font URLs, the font family name, the landing-page URL | none; never commits, pushes or uploads to App Store Connect | git, python3 (Pillow), headless Chrome/Chromium, asm, web fetch/browse |
 | appstore-review-checker | your git remote | none | none; never reads App Store Connect keys | git |
 | aso-marketing | your git remote | none | none; store uploads are left to you | git |
 | auto-push | your git remote | all working-tree changes and the commit message | `git add`, commit and push, automatic once the safety scan passes | git |

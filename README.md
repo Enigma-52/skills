@@ -46,8 +46,8 @@ See [CHANGELOG.md](CHANGELOG.md) for the full release history.
 ### lstack: direct Claude Code plugin
 
 [lstack 0.5.0](packages/lstack/README.md) packages the canonical `skills/` tree as one
-Claude Code plugin: 39 top-level definitions plus the two nested diagram-generator
-children, **41** namespaced skills in total. `skills/` is the plugin folder; the root
+Claude Code plugin: 40 top-level definitions plus the two nested diagram-generator
+children, **42** namespaced skills in total. `skills/` is the plugin folder; the root
 marketplace points at it.
 
 ```bash
@@ -183,7 +183,7 @@ These other task areas don't have a task skill. Each skill in them stands alone,
 
 | Task | Skills, in order |
 |---|---|
-| Prepare an app store submission | aso-marketing → appstore-review-checker |
+| Prepare an app store submission | aso-marketing → appstore-assets → appstore-review-checker |
 | Harden and ship a repo | security-setup → devops-pipeline → ship (auto-push and cleanup-project for day-to-day work) |
 | Open-source a project | oss-ready → doc-manager → landing-page-generator |
 | Brand and launch | brand-name-checker → logo-designer → landing-page-generator |
@@ -293,6 +293,7 @@ Adjacent skills: **test-coverage** (generate tests for untested branches) · **d
 | Skill | Version | Effort | What it does |
 |---|---|---|---|
 | [**aso-marketing**](skills/aso-marketing/) | 1.4.0 | max | App Store + Google Play keyword and metadata optimization |
+| [**appstore-assets**](skills/appstore-assets/) | 1.0.0 | high | Upload-ready App Store screenshots and creative assets for iPhone, iPad and Mac, from code or a landing page |
 | [**appstore-review-checker**](skills/appstore-review-checker/) | 1.4.0 | high | Pre-submission audit vs Apple guidelines |
 
 ### Tooling
