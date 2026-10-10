@@ -19,11 +19,16 @@ Skills are independent files. Works with Claude Code, Cursor, Windsurf, GitHub C
 
 ---
 
-## What's New in 4.0.0
+## What's New in 4.1.0
 
-This catalog release adds [lstack](packages/lstack/README.md) bundles and Claude Code/Codex plugin distributions, autonomous releases with [ship](skills/ship/), and clearer unit-test guidance in [test-coverage](skills/test-coverage/) and [agent-config](skills/agent-config/). Individual skills keep their own versions; the catalog release does not reset them to 4.0.0.
+This catalog release makes `skills/` the Claude Code plugin folder for [lstack](packages/lstack/README.md) 0.5.0, the layout prepared for the Claude Code plugin directory, with a [listing page](skills/README.md#what-each-skill-runs-sends-or-fetches) that discloses what each skill runs, sends or fetches. It adds [appstore-assets](skills/appstore-assets/) for upload-ready App Store screenshots and creative assets, gives every CLI that [cli-builder](skills/cli-builder/) builds a btop-inspired style, and pins install commands to `npx skills@1.7.0`. Individual skills keep their own versions; the catalog release does not reset them to 4.1.0.
 
-**Upgrading from 3.0.0:**
+**Upgrading from 4.0.0:**
+
+- If you load lstack from a clone with `--plugin-dir`, point it at the clone's `skills/` folder instead of the repository root: `claude --plugin-dir /absolute/path/to/checkout/skills`. ZIP downloads install as before.
+- If you installed lstack from this repository's marketplace, run `claude plugin marketplace update lstack`, then `claude plugin update lstack@lstack --scope user`, and restart Claude Code.
+
+**Earlier upgrade guidance (from 3.0.0):**
 
 - Install [**ship**](skills/ship/docs/README.md): `npx skills@1.7.0 add https://github.com/luongnv89/skills --skill ship`, then replace `/release-manager` invocations with `/ship`.
 - Review and remove the obsolete installed `release-manager` copy yourself; reinstalling does not remove it automatically, and both names can compete for triggers.
@@ -199,7 +204,7 @@ These other task areas don't have a task skill. Each skill in them stands alone,
 | [Career Research](#career-research) | Tailored job discovery with employer/product due diligence |
 | [Frontend & Design](#frontend--design) | UIs, logos, diagrams, design optimization |
 | [Documentation](#documentation) | Docs gen, READMEs, SEO, OSS prep, agent config |
-| [App Store](#app-store) | ASO, review compliance |
+| [App Store](#app-store) | ASO, screenshots and creative assets, review compliance |
 | [Tooling](#tooling) | CLIs, installers, local models, agent comms |
 
 ### Code Quality
