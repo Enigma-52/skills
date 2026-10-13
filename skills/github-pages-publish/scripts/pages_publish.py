@@ -406,6 +406,10 @@ def resolve_local(root, page_rel, link):
 
 ATTR_LINK_RE = re.compile(r"""((?:href|src|poster|action|data)\s*=\s*)(["'])/(?!/)([^"']*)\2""", re.I)
 SRCSET_RE = re.compile(r"""(srcset\s*=\s*)(["'])([^"']*)\2""", re.I)
+# Unquoted values (minified HTML) are rewritten only inside start tags, never in text, comments, or script/style bodies.
+TAG_RE = re.compile(r"""(?P<open><(?P<raw>script|style)\b(?:[^>"']|"[^"]*"|'[^']*')*>)(?:.*?</(?P=raw)\s*>|.*$)"""
+                    r"""|<!--.*?-->|(?P<tag><[A-Za-z](?:[^>"']|"[^"]*"|'[^']*')*>)""", re.S | re.I)
+TAG_ATTR_RE = re.compile(r"""([^\s"'=<>/]+)(\s*=\s*)("[^"]*"|'[^']*'|[^\s"'>][^\s>]*)""")
 CSS_ROOT_RE = re.compile(r"""(url\(\s*)(['"]?)/(?!/)([^'")]*)\2(\s*\))""", re.I)
 
 
@@ -430,15 +434,38 @@ def fix_root_links(root, rel, base=None):
         changed.append("/" + m.group(3))
         return "%s%s%s%s" % (m.group(1), m.group(2), (prefix + m.group(3)) or "./", m.group(2))
 
-    def srcset(m):
+    def srcset_value(value, sep):
         parts = []
-        for cand in m.group(3).split(","):
+        for cand in value.split(","):
             c = cand.strip()
             if c.startswith("/") and not c.startswith("//") and strip_base(c.split()[0], base) == c.split()[0]:
                 changed.append(c.split()[0])
                 c = prefix + c[1:]
             parts.append(c)
-        return "%s%s%s%s" % (m.group(1), m.group(2), ", ".join(parts), m.group(2))
+        return sep.join(parts)
+
+    def srcset(m):
+        return "%s%s%s%s" % (m.group(1), m.group(2), srcset_value(m.group(3), ", "), m.group(2))
+
+    def bare(m):
+        name, eq, val = m.groups()
+        if val[0] in "\"'":
+            return m.group(0)  # quoted: handled by the passes above
+        if name.lower() in LinkParser.ATTRS and val.startswith("/") and not val.startswith("//"):
+            if strip_base(val, base) != val:
+                return m.group(0)
+            changed.append(val)
+            return name + eq + ((prefix + val[1:]) or "./")
+        if name.lower() == "srcset":
+            return name + eq + (srcset_value(val, ",") or "./")  # unquoted: no spaces allowed
+        return m.group(0)
+
+    def tag(m):
+        if m.group("open"):
+            return TAG_ATTR_RE.sub(bare, m.group("open")) + m.group(0)[len(m.group("open")):]
+        if m.group("tag"):
+            return TAG_ATTR_RE.sub(bare, m.group("tag"))
+        return m.group(0)  # comment
 
     def css(m):
         if strip_base("/" + m.group(3), base) != "/" + m.group(3):
@@ -450,6 +477,7 @@ def fix_root_links(root, rel, base=None):
     if rel.lower().endswith((".html", ".htm")):
         new = ATTR_LINK_RE.sub(attr, new)
         new = SRCSET_RE.sub(srcset, new)
+        new = TAG_RE.sub(tag, new)
     new = CSS_ROOT_RE.sub(css, new)
     if new != text:
         with open(path, "w", encoding="utf-8", errors="surrogateescape") as f:
@@ -565,8 +593,9 @@ def cmd_sync_site(a):
     if moved_from is not None:
         old_prefix = "" if moved_from == "." else moved_from + "/"
         old_tracked = set(tracked_files(repo, moved_from))
+        published = {prefix + r for r in new_files}  # an overlapping old path now holds a new page
         old_deleted = [old_prefix + f for f in prev.get("files", []) if f in old_tracked
-                       and posixpath.basename(f) not in KEEP_IN_SITE_DIR]
+                       and posixpath.basename(f) not in KEEP_IN_SITE_DIR and old_prefix + f not in published]
         candidates = []
     else:
         old_deleted = []
