@@ -1,0 +1,32 @@
+{
+  "site_dir": "docs",
+  "files": [
+    "DECISIONS.md",
+    "archive/APPSTORE_IMPLEMENTATION_CHECKLIST.md",
+    "archive/APPSTORE_SKILL_REVIEW.md",
+    "archive/APPSTORE_SKILL_TEST_SUMMARY.md",
+    "archive/COMPLETE_IMPLEMENTATION_SUMMARY.md",
+    "archive/DEPLOYMENT_CHECKLIST.md",
+    "archive/IMPLEMENTATION_COMPLETE.md",
+    "archive/MEDIUM_PRIORITY_SKILLS_REVIEW.md",
+    "archive/MEDIUM_PRIORITY_SUBAGENT_ARCHITECTURES.md",
+    "archive/PHASE_1_SUMMARY.md",
+    "archive/README.backup.md",
+    "archive/README.md",
+    "archive/SUBAGENT_ADOPTION_PLAN.md",
+    "assets/logo/brand-showcase.html",
+    "assets/logo/favicon.svg",
+    "assets/logo/logo-black.svg",
+    "assets/logo/logo-full.svg",
+    "assets/logo/logo-icon.svg",
+    "assets/logo/logo-mark.svg",
+    "assets/logo/logo-white.svg",
+    "assets/logo/logo-wordmark.svg",
+    "brand_kit.md",
+    "guide-building-agent-skills.md",
+    "index.html",
+    "troubleshooting.md"
+  ],
+  "tool": "github-pages-publish",
+  "published_at": "2026-10-13T12:51:08+00:00"
+}
