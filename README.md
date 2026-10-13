@@ -19,11 +19,17 @@ Skills are independent files. Works with Claude Code, Cursor, Windsurf, GitHub C
 
 ---
 
-## What's New in 4.1.0
+## What's New in 4.2.0
 
-This catalog release makes `skills/` the Claude Code plugin folder for [lstack](packages/lstack/README.md) 0.5.0, the layout prepared for the Claude Code plugin directory, with a [listing page](skills/README.md#what-each-skill-runs-sends-or-fetches) that discloses what each skill runs, sends or fetches. It adds [appstore-assets](skills/appstore-assets/) for upload-ready App Store screenshots and creative assets, gives every CLI that [cli-builder](skills/cli-builder/) builds a btop-inspired style, and pins install commands to `npx skills@1.7.0`. Individual skills keep their own versions; the catalog release does not reset them to 4.1.0.
+This catalog release adds [github-pages-publish](skills/github-pages-publish/), which publishes or updates a static site on GitHub Pages through GitHub Actions in any repo, asks before creating a public repo, publishing from a private one or enabling Actions, and reports the URL only after the live site serves the committed files. Before release, its 1.0.2 stopped deleting just-published pages when a moved site overlaps the old one, learned to rewrite unquoted root-absolute links that minifiers emit, and gained a unit test suite that runs in CI. [lstack](packages/lstack/README.md) 0.6.0 adds it for 43 skills and gives the plugin an icon for its Claude Code plugin directory listing. Eval fixtures move to `eval-fixtures/<skill>/` at the repository root, which keeps the `skills/` plugin folder under the directory's 512-file limit. Individual skills keep their own versions; the catalog release does not reset them to 4.2.0.
 
-**Upgrading from 4.0.0:**
+**Upgrading from 4.1.0:**
+
+- Add the new skill: `npx skills@1.7.0 add https://github.com/luongnv89/skills --skill github-pages-publish`. Skills you already installed are unchanged.
+- If you installed lstack from this repository's marketplace, run `claude plugin marketplace update lstack`, then `claude plugin update lstack@lstack --scope user`, and restart Claude Code to get 0.6.0. ZIP users download `lstack-0.6.0.zip`, `lstack-claude-0.6.0.zip` or `lstack-codex-0.6.0.zip` from the [v4.2.0 release](https://github.com/luongnv89/skills/releases/tag/v4.2.0) and install them as before.
+- Contributors: put eval input fixtures in `eval-fixtures/<skill>/`, never under `skills/`, and point `evals/evals.json` `files` entries at `../../eval-fixtures/<skill>/` (see [CONTRIBUTING.md](CONTRIBUTING.md)).
+
+**Earlier upgrade guidance (from 4.0.0):**
 
 - If you load lstack from a clone with `--plugin-dir`, point it at the clone's `skills/` folder instead of the repository root: `claude --plugin-dir /absolute/path/to/checkout/skills`. ZIP downloads install as before.
 - If you installed lstack from this repository's marketplace, run `claude plugin marketplace update lstack`, then `claude plugin update lstack@lstack --scope user`, and restart Claude Code.
@@ -50,7 +56,7 @@ See [CHANGELOG.md](CHANGELOG.md) for the full release history.
 
 ### lstack: direct Claude Code plugin
 
-[lstack 0.5.0](packages/lstack/README.md) packages the canonical `skills/` tree as one
+[lstack 0.6.0](packages/lstack/README.md) packages the canonical `skills/` tree as one
 Claude Code plugin: 41 top-level definitions plus the two nested diagram-generator
 children, **43** namespaced skills in total. `skills/` is the plugin folder; the root
 marketplace points at it.
