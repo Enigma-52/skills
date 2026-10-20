@@ -800,7 +800,7 @@ def cmd_collect(a) -> None:
     previous = {}
     if (run_dir / "findings.json").exists():
         previous = {f["id"]: f for f in load_json(run_dir / "findings.json", "findings.json").get("findings", [])
-                    if isinstance(f, dict) and "id" in f}
+                    if isinstance(f, dict) and isinstance(f.get("id"), str)}
     errors, coverage, findings, perf, notes = [], [], [], [], []
     seen_findings, seen_journeys = {}, {}
     for path in files:
@@ -821,14 +821,16 @@ def cmd_collect(a) -> None:
             seen_journeys[jid] = path.name
             coverage.append({**row, "area": area, "discovered": jid not in expected})
         for f in data.get("findings") or []:
-            if f.get("id") in seen_findings:
-                errors.append(f"finding id {f.get('id')!r} is used in {seen_findings[f['id']]} and {path.name}")
+            fid = f.get("id") if isinstance(f.get("id"), str) else None  # finding_errors reports a bad id.
+            if fid is not None and fid in seen_findings:
+                errors.append(f"finding id {fid!r} is used in {seen_findings[fid]} and {path.name}")
                 continue
-            seen_findings[f.get("id")] = path.name
+            if fid is not None:
+                seen_findings[fid] = path.name
             merged = dict(f)
             merged.setdefault("status", "open")
             merged["area"] = area
-            old = previous.get(f.get("id"))
+            old = previous.get(fid)
             if old:
                 for key in ("status", "fix", "plan", "duplicate_of", "complexity", "complexity_reason"):
                     if key in old:
@@ -841,7 +843,7 @@ def cmd_collect(a) -> None:
         errors += finding_errors(run_dir, f, known)
     for row in coverage:
         for fid in row.get("findings") or []:
-            if fid not in seen_findings:
+            if not isinstance(fid, str) or fid not in seen_findings:
                 errors.append(f"coverage row for {row.get('journey')!r} cites unknown finding {fid!r}")
     missing = sorted(j for j in expected if j not in seen_journeys)
     if missing:
@@ -901,6 +903,11 @@ def cmd_update(a) -> None:
         data = load_json(path, "_run.json") if path.exists() else {"area": "_run", "coverage": [], "findings": []}
         data["findings"] = [f for f in data["findings"] if f.get("id") != patch["id"]] + [patch]
         save_json(path, data)
+        launch = patch.get("category") == "crash" and patch.get("journey") is None
+        if launch and run.get("app", {}).get("ready") is None and not (run_dir / "features.json").exists():
+            # A CLI launch check has no `app start`/`app wait` to record this; `collect` needs it.
+            deep_merge(run, {"app": {"ready": False}})
+            save_json(run_dir / "run.json", run)
         emit({"added": patch["id"], "file": str(path), "next": "run `collect` to merge it"})
         return
     if not a.finding:
@@ -984,6 +991,11 @@ def sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
+def diff_lines(path: Path) -> list[str]:
+    """Split on \\n only, keeping \\r\\n and a missing final newline, so the diff applies as written."""
+    return re.findall(r"[^\n]*\n|[^\n]+$", path.read_bytes().decode("utf-8", errors="replace"))
+
+
 def cmd_checkpoint(a) -> None:
     run_dir, run = open_run(a.run_dir)
     root = Path(run["root"])
@@ -1039,17 +1051,17 @@ def cmd_checkpoint(a) -> None:
     files, chunks = [], []
     for entry in manifest["files"]:
         path = root / entry["path"]
-        before = (base / "files" / entry["path"]).read_text(encoding="utf-8", errors="replace").splitlines(True) \
-            if entry["existed"] else []
-        after = path.read_text(encoding="utf-8", errors="replace").splitlines(True) if path.is_file() else []
+        before = diff_lines(base / "files" / entry["path"]) if entry["existed"] else []
+        after = diff_lines(path) if path.is_file() else []
         diff = list(difflib.unified_diff(before, after, f"a/{entry['path']}", f"b/{entry['path']}"))
-        added = sum(1 for d in diff if d.startswith("+") and not d.startswith("+++"))
-        removed = sum(1 for d in diff if d.startswith("-") and not d.startswith("---"))
+        hunks = diff[2:]  # Skip the ---/+++ header pair; a content line may itself start with -- or ++.
+        added = sum(1 for d in hunks if d.startswith("+"))
+        removed = sum(1 for d in hunks if d.startswith("-"))
         if diff:
             files.append({"path": entry["path"], "added": added, "removed": removed})
-            chunks.append("".join(diff))
+            chunks.append("".join(d if d.endswith("\n") else d + "\n\\ No newline at end of file\n" for d in diff))
     patch = base / "fix.diff"
-    patch.write_text("\n".join(chunks), encoding="utf-8")
+    patch.write_bytes("".join(chunks).encode("utf-8"))
     emit({"fix": a.fix, "files": files, "diff": str(patch.relative_to(run_dir)),
           "lines_changed": sum(f["added"] + f["removed"] for f in files)})
 
@@ -1106,9 +1118,16 @@ def run_result(run: dict, store: dict) -> tuple[str, list[str]]:
     if gaps:
         reasons.append(f"{len(gaps)} journey(s) blocked or skipped")
     final = run.get("checks", {}).get("final") or {}
-    if any(isinstance(final.get(k), dict) and final[k].get("exit") != 0 for k in ("build", "test")):
-        reasons.append("the final build or test check did not exit 0")
+    if isinstance(final.get("build"), dict) and final["build"].get("exit") != 0:
+        reasons.append("the final build check did not exit 0")
+    if isinstance(final.get("test"), dict) and final["test"].get("exit") != 0 and not baseline_tests_failed(run):
+        reasons.append("the final test check did not exit 0")
     return ("PARTIAL" if reasons else "COMPLETE"), reasons
+
+
+def baseline_tests_failed(run: dict) -> bool:
+    baseline = (run.get("checks", {}).get("baseline") or {}).get("test")
+    return isinstance(baseline, dict) and baseline.get("exit") != 0
 
 
 def decision_lines(run: dict, store: dict) -> list[str]:
@@ -1149,6 +1168,11 @@ def summarize(run: dict, features: dict | None, store: dict) -> dict:
     if any(p.get("build") == "dev" for p in store.get("perf", [])):
         uncertainty.append("Performance samples marked dev come from a development build; "
                            "production numbers usually differ.")
+    final_test = (run.get("checks", {}).get("final") or {}).get("test")
+    if isinstance(final_test, dict) and final_test.get("exit") != 0 and baseline_tests_failed(run):
+        uncertainty.append(f"Baseline tests were already failing (exit {run['checks']['baseline']['test'].get('exit')}); "
+                           f"the final test check also exited {final_test.get('exit')}, so it is not counted as a "
+                           "regression. Compare the baseline and final test logs for new failures.")
     uncertainty += list(run.get("notes", [])) + list(store.get("notes", []))
     if not uncertainty:
         uncertainty.append("No untested journeys or open questions recorded within the checks above.")
@@ -1257,7 +1281,7 @@ HTML_TEMPLATE = """<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>User test report</title>
 <style>
-:root{--bg:#fff;--fg:#1d2330;--muted:#5d6675;--line:#dde1e8;--card:#f6f7f9;--accent:#2457c5;
+:root{color-scheme:light dark;--bg:#fff;--fg:#1d2330;--muted:#5d6675;--line:#dde1e8;--card:#f6f7f9;--accent:#2457c5;
 --critical:#b42318;--high:#c4320a;--medium:#a15c07;--low:#4b5565;--pass:#067647;--fail:#b42318;--blocked:#a15c07}
 @media (prefers-color-scheme:dark){:root{--bg:#12151b;--fg:#e6e9ef;--muted:#9aa3b2;--line:#2b313c;--card:#1a1f27;
 --accent:#7aa2ff;--critical:#ff8a80;--high:#ffab70;--medium:#f5c46b;--low:#b3bccb;--pass:#6ce0a6;--fail:#ff8a80;--blocked:#f5c46b}}
@@ -1270,12 +1294,14 @@ main{max-width:1100px;margin:0 auto;padding:24px 16px 64px}h1{font-size:1.5rem;m
 .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin:16px 0}
 .card{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:10px 12px}.card b{display:block;font-size:1.3rem}
 .decision{border-left:4px solid var(--accent);background:var(--card);padding:8px 12px;border-radius:4px}
-.filters{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:8px 0;position:sticky;top:0;background:var(--bg);padding:8px 0;z-index:1}
+.filters{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:8px 0;background:var(--bg);padding:8px 0;z-index:1}
+@media (min-width:641px){.filters{position:sticky;top:0}}
 select,input,button{font:inherit;color:inherit;background:var(--card);border:1px solid var(--line);border-radius:6px;padding:4px 8px}
 button{cursor:pointer}details{border:1px solid var(--line);border-radius:8px;margin:6px 0;background:var(--card)}
 summary{cursor:pointer;padding:8px 12px;display:flex;gap:8px;flex-wrap:wrap;align-items:baseline;list-style:none}details[open] summary{border-bottom:1px solid var(--line)}
-summary::-webkit-details-marker{display:none}summary::before{content:'▸';color:var(--muted)}details[open]>summary::before{content:'▾'}
+summary::-webkit-details-marker{display:none}summary::before{content:'▸';content:'▸' / '';color:var(--muted)}details[open]>summary::before{content:'▾';content:'▾' / ''}
 #list>details{scroll-margin-top:var(--filters-h,72px)}
+@media (max-width:640px){select,input,button{min-height:44px}#list>details{scroll-margin-top:8px}}
 .body{padding:8px 16px}.body dt{font-weight:600;margin-top:6px}.body dd{margin:0 0 4px}
 .missing{color:var(--muted);font-style:italic}.thumbs{display:flex;flex-wrap:wrap;gap:8px}.thumbs img{max-width:260px;max-height:180px;border:1px solid var(--line);border-radius:4px}
 table{border-collapse:collapse;width:100%;font-size:.9rem}th,td{border-bottom:1px solid var(--line);padding:4px 6px;text-align:left;vertical-align:top}
